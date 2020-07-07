@@ -20,11 +20,7 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     implementation 'org.springframework.cloud:spring-cloud-starter-openfeign'
-    compile 'io.github.openfeign:feign-reactive-wrappers:10.4.0'
-//    implementation 'com.playtika.reactivefeign:feign-reactor:2.0.8'
-//    implementation 'com.playtika.reactivefeign:feign-reactor-webclient:2.0.8'
-//    implementation 'com.playtika.reactivefeign:feign-reactor-cloud:2.0.8'
-//    implementation 'com.playtika.reactivefeign:feign-reactor-spring-configuration:2.0.8'
+    compile 'io.github.openfeign:feign-reactive-wrappers:10.10.1'
     testImplementation('org.springframework.boot:spring-boot-starter-test') {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }

@@ -1,41 +1,28 @@
 package com.example.demo;
 
+import feign.Util;
 import feign.reactive.ReactorFeign;
-import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.cloud.openfeign.EnableFeignClients;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.publisher.MonoSink;
-import reactor.util.function.Tuple2;
-import rx.plugins.RxJavaCompletableExecutionHook;
 
 import javax.servlet.http.HttpServletRequest;
-import java.awt.*;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-@EnableFeignClients
 @SpringBootApplication
 @RestController
 public class DemoApplication {
 
-
-    @Autowired
-    private FeedInterface feedInterface;
-
-    @Autowired
-    private UserInterface userInterface;
 
     @Autowired
     private HttpServletRequest httpServletRequest;
@@ -48,13 +35,13 @@ public class DemoApplication {
 
     @GetMapping("/s")
     public Mono<String> search(String keyword) {
-        log.info(keyword);
+        log.info("Receives the request. params[{}]", keyword);
         try {
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-        return Mono.just("abs");
+        return Mono.just(keyword);
     }
 
     @GetMapping("/feeds")
@@ -80,42 +67,119 @@ public class DemoApplication {
         return Mono.just(123);
     }
 
-    @GetMapping("/test")
-    public String test() {
-        long begin = System.currentTimeMillis();https://github.com/JasonPEP/FeignReactiveDemo.git
-        SearchInterface target = ReactorFeign.builder().target(SearchInterface.class, "http://baidu.com");
-        Mono<String> abc = target.search("abc");
-        abc.doOnSuccess(result -> log.info("{}", result)).subscribe();
-//        Mono<Object> aaabc = Mono.create(sink -> sink.success(searchInterface.search("aaabc")));
+    @GetMapping("/test1")
+    public String test1() {
+        long begin = System.currentTimeMillis();
+        Map<String, Object> requestResults = new ConcurrentHashMap<>();
 
-        log.info("{}", System.currentTimeMillis() - begin);
-        return "test";
+        SearchInterface searchInterface = ReactorFeign.builder().target(SearchInterface.class, "http://localhost:8080/");
+
+        UserInterface userInterface = ReactorFeign.builder()
+                .decoder((response, type) -> {
+                    return Integer.valueOf(Util.toString(response.body().asReader(Util.UTF_8)));
+                })
+                .target(UserInterface.class, "http://localhost:8080/");
+
+        FeedInterface feedInterface = ReactorFeign.builder()
+                .decoder((response, type) -> {
+                    return null;
+                })
+                .target(FeedInterface.class, "http://localhost:8080/");
+
+        // Subscribe search API
+        Mono<String> searchSubscriber = searchInterface.search("abc").doOnSuccess(result -> {
+            log.info("Search API result [{}]", result);
+            requestResults.put("search", result);
+        });
+
+        // Subscribe user API
+        Mono<Integer> userSubscriber = userInterface.getUser("user 1").doOnSuccess(result -> {
+            log.info("User API result [{}]", result);
+            requestResults.put("user", result);
+        });
+
+        // Subscribe feed API
+        Mono<List<String>> feedSubscriber = feedInterface.feeds().doOnSuccess(results -> {
+            log.info("Feeds API [{}]", results);
+            requestResults.put("feeds", results);
+        });
+
+        Flux.merge(searchSubscriber, userSubscriber).doOnComplete(() -> {
+            log.info("All API requests on complete");
+        }).then().block();
+
+        long requestTime = System.currentTimeMillis() - begin;
+        log.info("Request time[{}]", requestTime);
+        log.info("[{}]", requestResults);
+        return String.format("Request time [%s]", requestTime);
     }
-Å
-//    @GetMapping("/test2")
-//    public Mono<Map<String, Object>> test2() {
-//        Map<String, Object> m = new HashMap<>();
-//        Mono<String> m1 = Mono.just(searchInterface.search("apple")).doOnSuccess(result -> {
-//            log.info("request search success!!! {}", result);
-//            m.put("searchInterface", result);
-//        });
-//        Mono<Integer> m2 = Mono.just(userInterface.getUser("u1u1")).doOnSuccess(user -> {
-//            log.info("request user success!!! {}", user);
-//            m.put("userInterface", user);
-//        });
-//        Mono<List<String>> f1 = Mono.just(feedInterface.feeds()).doOnSuccess(feeds -> {
-//            log.info("request feeds success!!! {}", feeds);
-//            m.put("feed", feeds);
-//        });
-//        long begin = System.currentTimeMillis();
-//        Flux<Object> merge = Flux.merge(m1, m2, f1);
-//        merge.doOnComplete(() -> log.info("{}", m)).then().block();
-//        log.info("{}", System.currentTimeMillis() - begin);
-//        return Mono.just(m);
-//    }
+
+    @GetMapping("/test2")
+    public String test2() {
+        long begin = System.currentTimeMillis();
+        Map<String, Object> requestResults = new ConcurrentHashMap<>();
+
+        SearchInterface searchInterface = ReactorFeign.builder().target(SearchInterface.class, "http://localhost:8080/");
+
+        UserInterface userInterface = ReactorFeign.builder()
+                .decoder((response, type) -> Integer.valueOf(Util.toString(response.body().asReader(Util.UTF_8))))
+                .target(UserInterface.class, "http://localhost:8080/");
+
+
+        searchInterface.search("abc").doOnSuccess(result -> {
+            log.info("Search API result [{}]", result);
+            requestResults.put("search", result);
+        }).block();
+
+        userInterface.getUser("user 1").doOnSuccess(result -> {
+            log.info("User API result [{}]", result);
+            requestResults.put("user", result);
+        }).block();
+
+
+        long requestTime = System.currentTimeMillis() - begin;
+        log.info("Request time[{}]", requestTime);
+        log.info("[{}]", requestResults);
+        return String.format("Request time [%s]", requestTime);
+    }
 
     @GetMapping("/test3")
-    public Mono<String> test3() {
+    public String test3() {
+        long begin = System.currentTimeMillis();
+        Map<String, Object> requestResults = new ConcurrentHashMap<>();
+
+        SearchInterface searchInterface = ReactorFeign.builder().target(SearchInterface.class, "http://localhost:8080/");
+
+        UserInterface userInterface = ReactorFeign.builder()
+                .decoder((response, type) -> Integer.valueOf(Util.toString(response.body().asReader(Util.UTF_8))))
+                .target(UserInterface.class, "http://localhost:8080/");
+
+
+        // Subscribe search API
+        Mono<String> searchSubscriber = searchInterface.search("abc").doOnSuccess(result -> {
+            log.info("Search API result [{}]", result);
+            requestResults.put("search", result);
+        });
+
+        // Subscribe user API
+        Mono<Integer> userSubscriber = userInterface.getUser("user 1").doOnSuccess(result -> {
+            log.info("User API result [{}]", result);
+            requestResults.put("user", result);
+        });
+
+
+        Flux.merge(searchSubscriber, userSubscriber).doOnComplete(() -> {
+            log.info("All API requests on complete");
+        }).then().subscribe();
+
+        long requestTime = System.currentTimeMillis() - begin;
+        log.info("Request time[{}]", requestTime);
+        log.info("[{}]", requestResults);
+        return String.format("Request time [%s]", requestTime);
+    }
+
+    @GetMapping("/test4")
+    public Mono<String> test4() {
         WebClient webClient = WebClient.create();
         Mono<String> stringMono = webClient.get().uri("http://localhost:8080/s?keyword=aa").retrieve().bodyToMono(String.class);
         long begin = System.currentTimeMillis();
@@ -124,4 +188,3 @@ public class DemoApplication {
         return Mono.just("stringMono");
     }
 }
-

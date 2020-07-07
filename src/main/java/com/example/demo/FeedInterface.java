@@ -1,13 +1,12 @@
 package com.example.demo;
 
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
+import feign.RequestLine;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 
-@FeignClient(value = "feed", url = "http://localhost:8080")
 public interface FeedInterface {
 
-    @GetMapping("/feeds")
-    List<String> feeds();
+    @RequestLine("GET /feeds")
+    Mono<List<String>> feeds();
 }

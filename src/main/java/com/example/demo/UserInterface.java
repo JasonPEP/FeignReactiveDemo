@@ -1,12 +1,11 @@
 package com.example.demo;
 
-import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import feign.Param;
+import feign.RequestLine;
+import reactor.core.publisher.Mono;
 
-@FeignClient(value = "user", url = "http://localhost:8080")
 public interface UserInterface {
 
-    @GetMapping("/user")
-    Integer getUser(@RequestParam("userId") String userId);
+    @RequestLine("GET /user?userId={userId}")
+    Mono<Integer> getUser(@Param("userId") String userId);
 }
